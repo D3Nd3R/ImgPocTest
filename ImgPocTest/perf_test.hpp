@@ -5,4 +5,6 @@
 
 void matInternalForEach(cv::Size imgSize, size_t threadNum);
 
+void parallelForTest(cv::Size imgSize, size_t threadNum);
+
 #endif // PERF_TEST_HPP

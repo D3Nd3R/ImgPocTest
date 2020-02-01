@@ -93,13 +93,51 @@ void matInternalForEach(cv::Size imgSize, size_t threadNum)
     cv::Mat_<double> surf = cv::Mat::zeros(imgSize, CV_64F);
 
     cv::setNumThreads(threadNum);
-    //int thNumReal = cv::getThreadNum();
-
     Profiler prf;
 
     prf.tic();
 
     surf.forEach(surfCalcSeq);
 
-    std::cout <<"threadsNum = " << cv::getNumThreads() << "   " << prf.toc() << " ms" << std::endl;
+    auto durationInMs = prf.toc();
+
+    std::cout << "[matInternalForEach]:\nresolution = " << imgSize <<" threadsNum = " << cv::getNumThreads() << "  " << durationInMs << "  ms" << std::endl;
+}
+
+void parallelForTest(cv::Size imgSize, size_t threadNum)
+{
+    auto points = makePivotPoints(imgSize);
+
+    cv::Mat_<double> surf = cv::Mat::zeros(imgSize, CV_64F);
+
+    cv::setNumThreads(threadNum);
+    Profiler prf;
+
+    auto surfCalcPar = [&points, &surf](const cv::Range& range){
+
+        std::array<double, pivotPointSize> dists;
+        for (int r = range.start; r < range.end; r++)
+        {
+            int row = r / surf.cols;
+            int col = r % surf.cols;
+
+            cv::Point2d curPos(col,row);
+            double total_dist {0.f};
+
+            for (size_t ii = 0; ii < dists.size(); ++ii){
+                double curDist = cv::norm(points[ii].pt - curPos);
+                dists[ii] = curDist;
+                total_dist += curDist;
+            }
+            double &val = surf.ptr<double>(row)[col];
+            for (size_t i = 0; i < points.size(); ++i) {
+                val += (dists[i] / total_dist) * points[i].val;
+            }
+        }
+    };
+    prf.tic();
+    cv::parallel_for_(cv::Range(0,surf.cols*surf.rows),surfCalcPar);
+    auto durationInMs = prf.toc();
+
+     std::cout << "[parallelForTest]:\nresolution = " << imgSize <<" threadsNum = " << cv::getNumThreads() << "  " << durationInMs << "  ms" << std::endl;
 }
